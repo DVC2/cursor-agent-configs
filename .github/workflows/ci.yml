@@ -35,8 +35,8 @@ jobs:
                   return None, "doubled frontmatter block"
               return m.group(1), None
 
-          # Rules
-          for p in glob.glob(".cursor/rules/*.mdc"):
+          # Rules (active + template packs)
+          for p in glob.glob(".cursor/rules/*.mdc") + glob.glob("templates/**/*.mdc", recursive=True):
               fm, err = frontmatter(p)
               if err: fails.append(f"{p}: {err}"); continue
               n = sum(1 for _ in open(p, encoding="utf-8"))
@@ -78,10 +78,19 @@ jobs:
           done
           exit $fail
 
+      - name: Shell scripts parse
+        run: |
+          fail=0
+          for f in scripts/*.sh .cursor/hooks/*.sh examples/hooks/*.sh .cursor/skills/*/scripts/*.sh; do
+            [ -e "$f" ] || continue
+            bash -n "$f" && echo "OK: $f" || { echo "SYNTAX ERROR: $f"; fail=1; }
+          done
+          exit $fail
+
       - name: Shellcheck (best effort)
         run: |
           if command -v shellcheck >/dev/null; then
-            shellcheck .cursor/hooks/*.sh scripts/*.sh || true
+            shellcheck scripts/*.sh .cursor/hooks/*.sh examples/hooks/*.sh .cursor/skills/*/scripts/*.sh || true
           else
             echo "shellcheck not installed; skipping"
           fi

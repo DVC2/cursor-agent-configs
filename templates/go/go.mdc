@@ -1,0 +1,18 @@
+---
+description: Go project conventions (copy to .cursor/rules/go.mdc)
+globs: ["**/*.go"]
+alwaysApply: false
+---
+
+# Go conventions
+
+Formatting is owned by `gofmt`/`goimports`; broader lint by `golangci-lint`. This rule covers
+project choices and idioms.
+
+- **Errors over panics** in library code. Wrap with context: `fmt.Errorf("doing X: %w", err)`;
+  inspect with `errors.Is`/`errors.As`. Never discard with `_ =`.
+- `context.Context` is the first parameter for I/O-bound/cancelable work; never stored in a struct.
+- Accept interfaces, return concrete types; define small interfaces at the consumer.
+- Guard shared state and test concurrency with `go test -race`.
+- Table-driven tests with `t.Run` subtests; `t.Helper()` in helpers.
+- Set explicit timeouts on HTTP clients/servers; parameterized queries only (no string-built SQL).
