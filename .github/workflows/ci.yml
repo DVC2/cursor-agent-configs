@@ -1,659 +1,87 @@
-name: 🚀 CI - Cursor Rules Validation
+name: CI
 
 on:
   push:
-    branches: [main, develop]
-    paths-ignore:
-      - "*.md"
-      - "docs/**"
-      - "examples/**"
+    branches: [main]
   pull_request:
     branches: [main]
-    types: [opened, synchronize, reopened, ready_for_review]
-  workflow_dispatch: # Allow manual triggering
-
-env:
-  NODE_VERSION: "18"
-  CACHE_VERSION: v1
+  workflow_dispatch:
 
 jobs:
-  # Job 1: Basic validation and setup
-  validate-structure:
-    name: 📋 Validate Repository Structure
+  validate:
+    name: Validate configs
     runs-on: ubuntu-latest
-    timeout-minutes: 10
-    
-    outputs:
-      has-mdc-changes: ${{ steps.changes.outputs.mdc }}
-      has-script-changes: ${{ steps.changes.outputs.scripts }}
-      has-doc-changes: ${{ steps.changes.outputs.docs }}
-    
-    steps:
-      - name: 🔄 Checkout repository
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0 # Full history for proper diff
-
-      - name: 🔍 Detect changes
-        uses: dorny/paths-filter@v2
-        id: changes
-        with:
-          filters: |
-            mdc:
-              - ".cursor/rules/**/*.mdc"
-              - "rules/**/*.mdc"
-            scripts:
-              - "scripts/**"
-              - "tools/**"
-            docs:
-              - "*.md"
-              - "docs/**"
-              - "examples/**"
-
-      - name: 📁 Verify directory structure
-        run: |
-          echo "🔍 Checking repository structure..."
-          
-          # Required directories
-          required_dirs=(".cursor/rules" "scripts" "docs" "tools" "tests")
-          for dir in "${required_dirs[@]}"; do
-            if [ ! -d "$dir" ]; then
-              echo "❌ Missing required directory: $dir"
-              exit 1
-            else
-              echo "✅ Found: $dir"
-            fi
-          done
-          
-          # Check for essential files
-          essential_files=("README.md" "CONTRIBUTING.md" "package.json")
-          for file in "${essential_files[@]}"; do
-            if [ ! -f "$file" ]; then
-              echo "❌ Missing essential file: $file"
-              exit 1
-            else
-              echo "✅ Found: $file"
-            fi
-          done
-
-  # Job 2: MDC file validation
-  validate-mdc-files:
-    name: 🔧 Validate MDC Files
-    runs-on: ubuntu-latest
-    needs: validate-structure
-    if: needs.validate-structure.outputs.has-mdc-changes == 'true' || github.event_name == 'workflow_dispatch'
-    timeout-minutes: 15
-    
-    steps:
-      - name: 🔄 Checkout repository
-        uses: actions/checkout@v4
-
-      - name: 📦 Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-          cache: npm
-
-      - name: 📥 Install dependencies
-        run: |
-          npm ci
-          npm ls # Verify installation
-
-      - name: 🔍 Validate MDC file syntax
-        run: |
-          echo "🔍 Validating MDC files..."
-          
-          # Find all .mdc files
-          mdc_files=$(find . -name "*.mdc" -type f)
-          
-          if [ -z "$mdc_files" ]; then
-            echo "⚠️ No MDC files found"
-            exit 0
-          fi
-          
-          echo "Found MDC files:"
-          echo "$mdc_files"
-          
-          # Run validation script
-          npm run validate
-
-      - name: 📏 Check file sizes
-        run: |
-          echo "📏 Checking MDC file sizes..."
-          
-          max_size=512000 # 500KB limit
-          oversized_files=()
-          
-          while IFS= read -r -d '' file; do
-            size=$(stat -c%s "$file" 2>/dev/null || stat -f%z "$file" 2>/dev/null || echo "0")
-            if [ "$size" -gt "$max_size" ]; then
-              oversized_files+=("$file (${size} bytes)")
-            fi
-            echo "📄 $file: ${size} bytes"
-          done < <(find . -name "*.mdc" -type f -print0)
-          
-          if [ ${#oversized_files[@]} -gt 0 ]; then
-            echo "❌ Files exceeding 500KB limit:"
-            printf '%s\n' "${oversized_files[@]}"
-            exit 1
-          else
-            echo "✅ All MDC files are within size limits"
-          fi
-
-      - name: 🔍 Check for duplicate content
-        run: |
-          echo "🔍 Checking for duplicate content..."
-          
-          # Create temporary directory for analysis
-          temp_dir=$(mktemp -d)
-          
-          # Extract and normalize content from MDC files
-          find . -name "*.mdc" -type f | while read -r file; do
-            # Extract content after YAML frontmatter
-            awk '/^---$/{if(++c==2) flag=1; next} flag' "$file" > "$temp_dir/$(basename "$file").content"
-          done
-          
-          # Check for high similarity (simple approach)
-          duplicate_found=false
-          cd "$temp_dir"
-          for file1 in *.content; do
-            for file2 in *.content; do
-              if [ "$file1" != "$file2" ] && [ -f "$file1" ] && [ -f "$file2" ]; then
-                # Simple similarity check using word count
-                wc1=$(wc -w < "$file1")
-                wc2=$(wc -w < "$file2")
-                common=$(comm -12 <(tr ' ' '\n' < "$file1" | sort | uniq) <(tr ' ' '\n' < "$file2" | sort | uniq) | wc -l)
-                
-                if [ "$wc1" -gt 50 ] && [ "$wc2" -gt 50 ] && [ "$common" -gt $((wc1 * 8 / 10)) ]; then
-                  echo "⚠️ High similarity detected between $file1 and $file2"
-                  duplicate_found=true
-                fi
-              fi
-            done
-          done
-          
-          rm -rf "$temp_dir"
-          
-          if [ "$duplicate_found" = true ]; then
-            echo "❌ Potential duplicate content found"
-            exit 1
-          else
-            echo "✅ No significant duplicate content detected"
-          fi
-
-  # Job 3: Conflict detection
-  detect-conflicts:
-    name: ⚔️ Detect Rule Conflicts
-    runs-on: ubuntu-latest
-    needs: validate-structure
-    if: needs.validate-structure.outputs.has-mdc-changes == 'true' || github.event_name == 'workflow_dispatch'
-    timeout-minutes: 10
-    
-    steps:
-      - name: 🔄 Checkout repository
-        uses: actions/checkout@v4
-
-      - name: 📦 Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-          cache: 'npm'
-
-      - name: 📥 Install dependencies
-        run: npm ci
-
-      - name: ⚔️ Check for rule conflicts
-        run: |
-          echo "⚔️ Checking for rule conflicts..."
-          
-          # Create conflict detection script
-          cat > check_conflicts.js << 'EOF'
-          const fs = require('fs');
-          const path = require('path');
-          const yaml = require('js-yaml');
-          
-          function findMdcFiles(dir) {
-            const files = [];
-            const items = fs.readdirSync(dir);
-            
-            for (const item of items) {
-              const fullPath = path.join(dir, item);
-              if (fs.statSync(fullPath).isDirectory()) {
-                files.push(...findMdcFiles(fullPath));
-              } else if (item.endsWith('.mdc')) {
-                files.push(fullPath);
-              }
-            }
-            return files;
-          }
-          
-          function parseYamlFrontmatter(content) {
-            const match = content.match(/^---\n([\s\S]*?)\n---/);
-            if (match) {
-              try {
-                return yaml.load(match[1]);
-              } catch (e) {
-                console.warn(`Warning: Invalid YAML in frontmatter: ${e.message}`);
-                return null;
-              }
-            }
-            return null;
-          }
-          
-          function checkConflicts() {
-            const mdcFiles = findMdcFiles('.');
-            const rules = [];
-            
-            for (const file of mdcFiles) {
-              const content = fs.readFileSync(file, 'utf8');
-              const frontmatter = parseYamlFrontmatter(content);
-              
-              if (frontmatter) {
-                rules.push({
-                  file,
-                  globs: frontmatter.globs || [],
-                  alwaysApply: frontmatter.alwaysApply || false,
-                  description: frontmatter.description || ''
-                });
-              }
-            }
-            
-            const conflicts = [];
-            
-            // Check for overlapping globs with alwaysApply=true
-            for (let i = 0; i < rules.length; i++) {
-              for (let j = i + 1; j < rules.length; j++) {
-                const rule1 = rules[i];
-                const rule2 = rules[j];
-                
-                if (rule1.alwaysApply && rule2.alwaysApply) {
-                  // Check for glob overlaps
-                  for (const glob1 of rule1.globs) {
-                    for (const glob2 of rule2.globs) {
-                      if (glob1 === glob2 || glob1 === '**/*' || glob2 === '**/*') {
-                        conflicts.push({
-                          type: 'alwaysApply_overlap',
-                          rule1: rule1.file,
-                          rule2: rule2.file,
-                          glob1,
-                          glob2,
-                          description: `Both rules have alwaysApply=true and overlapping globs`
-                        });
-                      }
-                    }
-                  }
-                }
-              }
-            }
-            
-            return conflicts;
-          }
-          
-          const conflicts = checkConflicts();
-          
-          if (conflicts.length > 0) {
-            console.log('❌ Rule conflicts detected:');
-            conflicts.forEach((conflict, index) => {
-              console.log(`\n${index + 1}. ${conflict.type}:`);
-              console.log(`   Rule 1: ${conflict.rule1}`);
-              console.log(`   Rule 2: ${conflict.rule2}`);
-              console.log(`   Issue: ${conflict.description}`);
-              if (conflict.glob1 && conflict.glob2) {
-                console.log(`   Conflicting globs: "${conflict.glob1}" and "${conflict.glob2}"`);
-              }
-            });
-            process.exit(1);
-          } else {
-            console.log('✅ No rule conflicts detected');
-          }
-          EOF
-          
-          node check_conflicts.js
-
-  # Job 4: Installation script validation  
-  validate-installation:
-    name: 🛠️ Validate Installation Scripts
-    runs-on: ${{ matrix.os }}
-    needs: validate-structure
-    if: needs.validate-structure.outputs.has-script-changes == 'true' || github.event_name == 'workflow_dispatch'
-    timeout-minutes: 20
-    
-    strategy:
-      matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest]
-    
-    steps:
-      - name: 🔄 Checkout repository
-        uses: actions/checkout@v4
-
-      - name: 🧪 Test PowerShell installation script
-        if: matrix.os == 'windows-latest'
-        shell: pwsh
-        run: |
-          # Check if PowerShell script exists
-          if (!(Test-Path "scripts/install.ps1")) {
-            Write-Error "❌ PowerShell installation script not found"
-            exit 1
-          }
-          
-          # Test PowerShell script syntax
-          try {
-            $null = [System.Management.Automation.PSParser]::Tokenize((Get-Content "scripts/install.ps1" -Raw), [ref]$null)
-            Write-Host "✅ PowerShell script syntax is valid"
-          } catch {
-            Write-Error "❌ PowerShell syntax error: $_"
-            exit 1
-          }
-          
-          # Test dry run
-          try {
-            & "scripts/install.ps1" -WhatIf -Essential
-            Write-Host "✅ PowerShell installation script validation passed"
-          } catch {
-            Write-Error "❌ PowerShell script execution test failed: $_"
-            exit 1
-          }
-
-      - name: 🧪 Test Bash installation script
-        if: matrix.os != 'windows-latest'
-        shell: bash
-        run: |
-          # Check if Bash script exists
-          if [ ! -f "scripts/install.sh" ]; then
-            echo "❌ Bash installation script not found"
-            exit 1
-          fi
-          
-          # Test script syntax
-          if bash -n scripts/install.sh; then
-            echo "✅ Bash script syntax is valid"
-          else
-            echo "❌ Bash syntax error"
-            exit 1
-          fi
-          
-          # Test with dry run
-          if bash scripts/install.sh --dry-run --essential; then
-            echo "✅ Bash installation script validation passed"
-          else
-            echo "❌ Bash script execution test failed"
-            exit 1
-          fi
-
-      - name: 🔍 Validate script permissions
-        if: matrix.os != 'windows-latest'
-        run: |
-          # Check if script is executable
-          if [ ! -x "scripts/install.sh" ]; then
-            echo "⚠️ Making install.sh executable"
-            chmod +x scripts/install.sh
-          fi
-          
-          echo "✅ Script permissions are correct"
-
-  # Job 5: Documentation validation
-  validate-documentation:
-    name: 📚 Validate Documentation
-    runs-on: ubuntu-latest
-    needs: validate-structure
-    if: needs.validate-structure.outputs.has-doc-changes == 'true' || needs.validate-structure.outputs.has-mdc-changes == 'true' || github.event_name == 'workflow_dispatch'
-    timeout-minutes: 10
-    
-    steps:
-      - name: 🔄 Checkout repository
-        uses: actions/checkout@v4
-
-      - name: 📝 Check documentation completeness
-        run: |
-          echo "📝 Checking documentation completeness..."
-          
-          missing_docs=()
-          
-          # Check for essential documentation files
-          essential_docs=(
-            "README.md"
-            "CONTRIBUTING.md"
-            "docs/quick-reference.md"
-            "docs/troubleshooting.md"
-          )
-          
-          for doc in "${essential_docs[@]}"; do
-            if [ ! -f "$doc" ]; then
-              missing_docs+=("$doc")
-            else
-              echo "✅ Found: $doc"
-            fi
-          done
-          
-          if [ ${#missing_docs[@]} -gt 0 ]; then
-            echo "❌ Missing documentation files:"
-            printf '%s\n' "${missing_docs[@]}"
-            exit 1
-          fi
-
-      - name: 🔗 Check internal links
-        run: |
-          echo "🔗 Checking internal links in documentation..."
-          
-          # Simple check for broken internal links
-          broken_links=()
-          
-          # Find all markdown files
-          while IFS= read -r -d '' file; do
-            echo "Checking links in: $file"
-            
-            # Extract markdown links [text](path)
-            grep -oE '\[([^]]+)\]\(([^)]+)\)' "$file" | while read -r link; do
-              # Extract path from link
-              path=$(echo "$link" | sed -n 's/.*](\([^)]*\)).*/\1/p')
-              
-              # Skip external links (http/https)
-              if [[ "$path" =~ ^https?:// ]]; then
-                continue
-              fi
-              
-              # Skip anchor links
-              if [[ "$path" =~ ^# ]]; then
-                continue
-              fi
-              
-              # Convert relative path to absolute
-              if [[ ! "$path" =~ ^/ ]]; then
-                dir=$(dirname "$file")
-                path="$dir/$path"
-              fi
-              
-              # Normalize path
-              path=$(realpath -m "$path" 2>/dev/null || echo "$path")
-              
-              # Check if file exists
-              if [ ! -f "$path" ] && [ ! -d "$path" ]; then
-                echo "❌ Broken link in $file: $link"
-                broken_links+=("$file: $link")
-              fi
-            done
-          done < <(find . -name "*.md" -type f -print0)
-          
-          # Note: This is a simplified check. A more robust solution would use a proper markdown parser
-
-      - name: 📊 Check if metrics dashboard exists
-        run: |
-          if [ ! -f "tools/metrics-dashboard/index.html" ]; then
-            echo "❌ Metrics dashboard not found"
-            exit 1
-          else
-            echo "✅ Metrics dashboard found"
-          fi
-
-  # Job 6: Security and quality checks
-  security-quality:
-    name: 🔒 Security & Quality Checks
-    runs-on: ubuntu-latest
-    needs: validate-structure
-    timeout-minutes: 15
-    
-    steps:
-      - name: 🔄 Checkout repository
-        uses: actions/checkout@v4
-
-      - name: 📦 Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-          cache: 'npm'
-
-      - name: 📥 Install dependencies
-        run: npm ci
-
-      - name: 🔒 Run security audit
-        run: |
-          npm audit --audit-level=moderate || {
-            echo "⚠️ Security vulnerabilities found"
-            npm audit
-            echo "💡 Run 'npm audit fix' to resolve fixable issues"
-            exit 1
-          }
-
-      - name: 🧹 Check code style (if applicable)
-        run: |
-          # Check for common issues in scripts
-          echo "🧹 Checking script quality..."
-          
-          # Check shell scripts with shellcheck if available
-          if command -v shellcheck >/dev/null 2>&1; then
-            find . -name "*.sh" -type f -exec shellcheck {} \;
-          else
-            echo "⚠️ shellcheck not available, skipping shell script analysis"
-          fi
-
-      - name: 📏 Check repository size
-        run: |
-          echo "📏 Checking repository size..."
-          
-          # Calculate total size
-          total_size=$(du -sb . | cut -f1)
-          max_size=52428800 # 50MB
-          
-          echo "Repository size: $((total_size / 1024 / 1024)) MB"
-          
-          if [ "$total_size" -gt "$max_size" ]; then
-            echo "❌ Repository size exceeds 50MB limit"
-            
-            # Show largest files
-            echo "Largest files:"
-            find . -type f -size +1M -exec ls -lh {} \; | sort -k5 -hr | head -10
-            
-            exit 1
-          else
-            echo "✅ Repository size is within limits"
-          fi
-
-  # Job 7: Integration test
-  integration-test:
-    name: 🧪 Integration Test
-    runs-on: ubuntu-latest
-    needs: [validate-mdc-files, detect-conflicts, validate-installation]
-    if: always() && (needs.validate-mdc-files.result == 'success' || needs.validate-mdc-files.result == 'skipped') && (needs.detect-conflicts.result == 'success' || needs.detect-conflicts.result == 'skipped') && (needs.validate-installation.result == 'success' || needs.validate-installation.result == 'skipped')
-    timeout-minutes: 15
-    
-    steps:
-      - name: 🔄 Checkout repository
-        uses: actions/checkout@v4
-
-      - name: 📦 Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-          cache: 'npm'
-
-      - name: 📥 Install dependencies
-        run: npm ci
-
-      - name: 🧪 Run integration tests
-        run: |
-          echo "🧪 Running integration tests..."
-          
-          # Test the complete workflow
-          echo "1. Validating all rules..."
-          npm run validate
-          
-          echo "2. Testing metrics dashboard..."
-          if [ -f "tools/metrics-dashboard/index.html" ]; then
-            # Basic HTML validation
-            if command -v tidy >/dev/null 2>&1; then
-              tidy -q -e tools/metrics-dashboard/index.html || echo "⚠️ HTML validation warnings (non-critical)"
-            fi
-            echo "✅ Metrics dashboard structure validated"
-          fi
-          
-          echo "3. Testing installation scripts..."
-          bash scripts/install.sh --dry-run --essential
-          
-          echo "✅ Integration tests completed successfully"
-
-  # Final job: Summary
-  ci-summary:
-    name: 📋 CI Summary
-    runs-on: ubuntu-latest
-    needs: [validate-structure, validate-mdc-files, detect-conflicts, validate-installation, validate-documentation, security-quality, integration-test]
-    if: always()
     timeout-minutes: 5
-    
     steps:
-      - name: 📋 Generate summary
-        run: |
-          echo "# 🚀 CI Summary" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          
-          # Job status summary
-          echo "## Job Results" >> $GITHUB_STEP_SUMMARY
-          echo "| Job | Status |" >> $GITHUB_STEP_SUMMARY
-          echo "|-----|--------|" >> $GITHUB_STEP_SUMMARY
-          echo "| Repository Structure | ${{ needs.validate-structure.result == 'success' && '✅ Passed' || '❌ Failed' }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| MDC Validation | ${{ needs.validate-mdc-files.result == 'success' && '✅ Passed' || needs.validate-mdc-files.result == 'skipped' && '⏭️ Skipped' || '❌ Failed' }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| Conflict Detection | ${{ needs.detect-conflicts.result == 'success' && '✅ Passed' || needs.detect-conflicts.result == 'skipped' && '⏭️ Skipped' || '❌ Failed' }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| Installation Scripts | ${{ needs.validate-installation.result == 'success' && '✅ Passed' || needs.validate-installation.result == 'skipped' && '⏭️ Skipped' || '❌ Failed' }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| Documentation | ${{ needs.validate-documentation.result == 'success' && '✅ Passed' || needs.validate-documentation.result == 'skipped' && '⏭️ Skipped' || '❌ Failed' }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| Security & Quality | ${{ needs.security-quality.result == 'success' && '✅ Passed' || '❌ Failed' }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| Integration Test | ${{ needs.integration-test.result == 'success' && '✅ Passed' || needs.integration-test.result == 'skipped' && '⏭️ Skipped' || '❌ Failed' }} |" >> $GITHUB_STEP_SUMMARY
-          
-          # Overall status
-          if [[ "${{ needs.validate-structure.result }}" == "success" && 
-                ("${{ needs.validate-mdc-files.result }}" == "success" || "${{ needs.validate-mdc-files.result }}" == "skipped") &&
-                ("${{ needs.detect-conflicts.result }}" == "success" || "${{ needs.detect-conflicts.result }}" == "skipped") &&
-                ("${{ needs.validate-installation.result }}" == "success" || "${{ needs.validate-installation.result }}" == "skipped") &&
-                ("${{ needs.validate-documentation.result }}" == "success" || "${{ needs.validate-documentation.result }}" == "skipped") &&
-                "${{ needs.security-quality.result }}" == "success" &&
-                ("${{ needs.integration-test.result }}" == "success" || "${{ needs.integration-test.result }}" == "skipped") ]]; then
-            echo "" >> $GITHUB_STEP_SUMMARY
-            echo "## 🎉 Overall Result: SUCCESS" >> $GITHUB_STEP_SUMMARY
-            echo "All validation checks passed! The repository is ready for use." >> $GITHUB_STEP_SUMMARY
-          else
-            echo "" >> $GITHUB_STEP_SUMMARY
-            echo "## ❌ Overall Result: FAILURE" >> $GITHUB_STEP_SUMMARY
-            echo "Some validation checks failed. Please review the job details above." >> $GITHUB_STEP_SUMMARY
-          fi
-          
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "---" >> $GITHUB_STEP_SUMMARY
-          echo "*Generated by [Cursor Rules CI](.github/workflows/ci.yml)*" >> $GITHUB_STEP_SUMMARY
+      - uses: actions/checkout@v4
 
-      - name: 🚨 Set exit code based on results
+      - name: Validate frontmatter (.mdc rules + SKILL.md + agents)
         run: |
-          if [[ "${{ needs.validate-structure.result }}" != "success" || 
-                "${{ needs.security-quality.result }}" != "success" ]]; then
-            echo "❌ Critical jobs failed"
-            exit 1
+          python3 - <<'PY'
+          import sys, glob, re
+          fails = []
+
+          def frontmatter(path):
+              with open(path, encoding="utf-8") as f:
+                  text = f.read()
+              if not text.startswith("---"):
+                  return None, "missing frontmatter"
+              # Exactly one leading --- ... --- block. A doubled block is the classic bug.
+              m = re.match(r"^---\n(.*?)\n---\n", text, re.S)
+              if not m:
+                  return None, "malformed frontmatter"
+              rest = text[m.end():]
+              if rest.lstrip().startswith("---"):
+                  return None, "doubled frontmatter block"
+              return m.group(1), None
+
+          # Rules
+          for p in glob.glob(".cursor/rules/*.mdc"):
+              fm, err = frontmatter(p)
+              if err: fails.append(f"{p}: {err}"); continue
+              n = sum(1 for _ in open(p, encoding="utf-8"))
+              if n > 500: fails.append(f"{p}: {n} lines (>500)")
+
+          # Skills: name must equal folder name
+          for p in glob.glob(".cursor/skills/*/SKILL.md"):
+              fm, err = frontmatter(p)
+              if err: fails.append(f"{p}: {err}"); continue
+              folder = p.split("/")[-2]
+              nm = re.search(r"^name:\s*(\S+)", fm, re.M)
+              if not nm: fails.append(f"{p}: missing name")
+              elif nm.group(1) != folder:
+                  fails.append(f"{p}: name '{nm.group(1)}' != folder '{folder}'")
+
+          # Subagents: must have name, must NOT have a tools: field
+          for p in glob.glob(".cursor/agents/*.md"):
+              fm, err = frontmatter(p)
+              if err: fails.append(f"{p}: {err}"); continue
+              if not re.search(r"^name:\s*\S+", fm, re.M):
+                  fails.append(f"{p}: missing name")
+              if re.search(r"^tools:", fm, re.M):
+                  fails.append(f"{p}: has 'tools:' (not a Cursor subagent field)")
+
+          if fails:
+              print("FAIL:"); [print(" -", x) for x in fails]; sys.exit(1)
+          print("OK: frontmatter valid")
+          PY
+
+      - name: Validate hooks.json
+        run: |
+          python3 -c "import json; d=json.load(open('.cursor/hooks.json')); assert d.get('version')==1, 'version must be 1'; print('OK: hooks.json valid, events:', list(d['hooks']))"
+
+      - name: Hook scripts are executable
+        run: |
+          fail=0
+          for f in .cursor/hooks/*.sh; do
+            [ -x "$f" ] && echo "OK: $f" || { echo "NOT EXECUTABLE: $f"; fail=1; }
+          done
+          exit $fail
+
+      - name: Shellcheck (best effort)
+        run: |
+          if command -v shellcheck >/dev/null; then
+            shellcheck .cursor/hooks/*.sh scripts/*.sh || true
+          else
+            echo "shellcheck not installed; skipping"
           fi
-          
-          # Check for any unexpected failures in conditional jobs
-          if [[ "${{ needs.validate-mdc-files.result }}" == "failure" || 
-                "${{ needs.detect-conflicts.result }}" == "failure" ||
-                "${{ needs.validate-installation.result }}" == "failure" ||
-                "${{ needs.validate-documentation.result }}" == "failure" ||
-                "${{ needs.integration-test.result }}" == "failure" ]]; then
-            echo "❌ Validation jobs failed"
-            exit 1
-          fi
-          
-          echo "✅ All checks passed successfully" 

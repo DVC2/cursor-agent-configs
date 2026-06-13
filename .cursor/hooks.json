@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "hooks": {
+    "afterFileEdit": [
+      {
+        "command": "./.cursor/hooks/format.sh"
+      }
+    ],
+    "beforeShellExecution": [
+      {
+        "command": "./.cursor/hooks/guard-destructive.sh"
+      }
+    ]
+  }
+}
