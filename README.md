@@ -1,6 +1,6 @@
 # Cursor & Agent Configs
 
-[![CI](https://github.com/DVC2/cursor_prompts/workflows/CI/badge.svg)](https://github.com/DVC2/cursor_prompts/actions)
+[![CI](https://github.com/DVC2/cursor-agent-configs/workflows/CI/badge.svg)](https://github.com/DVC2/cursor-agent-configs/actions)
 [![License: Unlicense](https://img.shields.io/badge/license-Unlicense-blue.svg)](LICENSE)
 [![Cursor](https://img.shields.io/badge/Cursor-2.4%2B-black.svg)](https://cursor.com/docs)
 
@@ -29,7 +29,7 @@ hard enforcement respectively.
 ## What's in here
 
 ```
-cursor_prompts/
+cursor-agent-configs/
 ├── AGENTS.md                       # this repo's own agent context (a worked example)
 ├── templates/
 │   ├── AGENTS.md                   # generic starter to copy into YOUR project
@@ -74,15 +74,15 @@ cursor_prompts/
 **Copy what you want — nothing here requires a build step, Node, or npm.**
 
 ```bash
-git clone https://github.com/DVC2/cursor_prompts.git
+git clone https://github.com/DVC2/cursor-agent-configs.git
 
 # Option A: scripted (interactive, backs up anything it would overwrite)
-cd your-project && /path/to/cursor_prompts/scripts/install.sh
+cd your-project && /path/to/cursor-agent-configs/scripts/install.sh
 
 # Option B: manual — copy only the pieces you want
-cp -r cursor_prompts/.cursor/agents   your-project/.cursor/
-cp -r cursor_prompts/.cursor/skills   your-project/.cursor/
-cp    cursor_prompts/templates/AGENTS.md  your-project/AGENTS.md   # then edit it
+cp -r cursor-agent-configs/.cursor/agents   your-project/.cursor/
+cp -r cursor-agent-configs/.cursor/skills   your-project/.cursor/
+cp    cursor-agent-configs/templates/AGENTS.md  your-project/AGENTS.md   # then edit it
 ```
 
 Then restart Cursor. Rules auto-attach by glob; Skills/subagents load on demand (invoke a
