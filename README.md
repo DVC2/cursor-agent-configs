@@ -1,5 +1,10 @@
 # Cursor & Agent Configs
 
+> ⚠️ **Archived — no longer maintained (as of June 2026).** This repo is read-only.
+> The configs still work and are public domain — copy what's useful. For current, living
+> guidance see [agents.md](https://agents.md) and the [Cursor docs](https://cursor.com/docs).
+> See [`SUNSET.md`](SUNSET.md) for why, and [`MIGRATION.md`](MIGRATION.md) for the history.
+
 [![CI](https://github.com/DVC2/cursor-agent-configs/workflows/CI/badge.svg)](https://github.com/DVC2/cursor-agent-configs/actions)
 [![License: Unlicense](https://img.shields.io/badge/license-Unlicense-blue.svg)](LICENSE)
 [![Cursor](https://img.shields.io/badge/Cursor-2.4%2B-black.svg)](https://cursor.com/docs)
