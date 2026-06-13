@@ -1,212 +1,98 @@
-# Advanced Cursor Rules Collection
+# Cursor & Agent Configs
 
-[![CI Status](https://github.com/DVC2/cursor_prompts/workflows/🚀%20CI%20-%20Cursor%20Rules%20Validation/badge.svg)](https://github.com/DVC2/cursor_prompts/actions)
-[![License](https://img.shields.io/badge/license-Public%20Domain-blue.svg)](LICENSE)
-[![MDC Rules](https://img.shields.io/badge/MDC%20Rules-11%20Active-green.svg)](.cursor/rules)
-[![Documentation](https://img.shields.io/badge/docs-Complete-brightgreen.svg)](docs/)
-[![Metrics Dashboard](https://img.shields.io/badge/📊-Metrics%20Dashboard-orange.svg)](tools/metrics-dashboard/index.html)
+[![CI](https://github.com/DVC2/cursor_prompts/workflows/CI/badge.svg)](https://github.com/DVC2/cursor_prompts/actions)
+[![License: Unlicense](https://img.shields.io/badge/license-Unlicense-blue.svg)](LICENSE)
+[![Cursor](https://img.shields.io/badge/Cursor-2.4%2B-black.svg)](https://cursor.com/docs)
 
-A curated collection of advanced `.mdc` rules for Cursor IDE that optimize AI agent behavior, memory management, and development workflows.
+Copy-paste configuration for getting the most out of [Cursor](https://cursor.com) and other
+AI coding agents in 2026 — built around the primitives Cursor actually ships today:
+**`AGENTS.md`, scoped rules, subagents, Skills, and hooks**.
 
-## 🎯 What This Repository Provides
+> **This repo was rebuilt in 2026.** It started in early 2025 as a pile of giant always-on
+> `.mdc` rules — an approach that's now an anti-pattern (it burns context and predates
+> subagents/Skills/hooks entirely). If you used the old version, see [`MIGRATION.md`](MIGRATION.md).
 
-This repository contains production-ready **Cursor project rules** (`.mdc` files) designed to:
+## The five primitives — and when to use each
 
-- **Optimize AI Memory Management**: Intelligent context pruning and pattern recognition
-- **Enhance Development Workflows**: Session coordination and decision tracking  
-- **Improve Debugging Efficiency**: Minimize tool calls while maximizing effectiveness
-- **Enforce Best Practices**: Common sense rules and mistake prevention
-- **Maintain Session Continuity**: Seamless handoffs and context retention
+| Primitive | Lives in | Use it when… | Reads cross-tool? |
+|---|---|---|---|
+| **`AGENTS.md`** | repo root (+ nested) | You want always-on project context: stack, conventions, commands. **Start here.** | ✅ Cursor, Codex, Copilot, Gemini CLI, Aider, Windsurf, Zed… |
+| **Rules** (`.mdc`) | `.cursor/rules/` | You need *scoped* guidance — applies only to matching files (`globs`) or when the agent judges it relevant (`description`). | Cursor only |
+| **Subagents** | `.cursor/agents/` | A task needs its own isolated context or a specialized persona (review, verify, test) — possibly run in parallel. | Cursor (+ `.claude`/`.codex` dirs) |
+| **Skills** | `.cursor/skills/<name>/SKILL.md` | You have an on-demand procedure that should load *only when relevant* (e.g. "write an ADR"), keeping context lean. | Cursor (+ compat dirs) |
+| **Hooks** | `.cursor/hooks.json` + `.cursor/hooks/` | You need *deterministic*, non-negotiable behavior around agent actions — format on save, block destructive commands. | Cursor |
 
-## 🏗️ Repository Structure
+Rule of thumb: **`AGENTS.md` first.** Add a scoped rule only when you hit a real scoping
+need; reach for a subagent/Skill/hook when the job is delegation, on-demand knowledge, or
+hard enforcement respectively.
+
+## What's in here
 
 ```
 cursor_prompts/
-├── README.md                   # This file
-├── .cursor/rules/             # Advanced Cursor project rules
-│   ├── memory-management.mdc  # Intelligent memory & context management
-│   ├── session-coordinator.mdc # Session continuity and handoffs
-│   ├── development-journal.mdc # Development pattern tracking
-│   ├── ADR.mdc                # Architectural Decision Records automation
-│   ├── debugging.mdc          # Efficient debugging optimization
-│   ├── efficiency.mdc         # Tool call and resource optimization
-│   ├── commonsense.mdc        # Best practices and mistake prevention
-│   ├── javascript.mdc         # JavaScript ES2022+ best practices
-│   ├── typescript.mdc         # TypeScript patterns and type system mastery
-│   ├── terminal.mdc           # Terminal operation optimization
-│   └── audit.mdc              # Comprehensive code quality assurance
-└── examples/                  # Usage guides and documentation
-    └── use_cases/
-        └── cursor-mdc-rules-guide.md # Comprehensive usage guide
+├── AGENTS.md                       # this repo's own agent context (a worked example)
+├── templates/
+│   └── AGENTS.md                   # starter AGENTS.md to copy into YOUR project
+├── .cursor/
+│   ├── rules/
+│   │   ├── javascript.mdc          # short, glob-scoped — defers style to ESLint/Prettier
+│   │   └── typescript.mdc          # short, glob-scoped — defers strictness to tsconfig
+│   ├── agents/
+│   │   ├── code-reviewer.md        # read-only diff reviewer with a severity ladder
+│   │   ├── verifier.md             # confirms "done" work actually runs
+│   │   └── test-author.md          # writes regression-catching tests
+│   ├── skills/
+│   │   ├── debug/SKILL.md          # systematic debug loop (reproduce→isolate→…→verify)
+│   │   └── write-adr/SKILL.md      # ADR template, lifecycle, and when-to-write gate
+│   ├── hooks.json
+│   └── hooks/
+│       ├── format.sh               # afterFileEdit: format the edited file
+│       └── guard-destructive.sh    # beforeShellExecution: block rm -rf /, force-push, …
+├── docs/                           # cheat sheet + troubleshooting
+├── scripts/                        # install.sh / install.ps1
+└── MIGRATION.md
 ```
 
-## 🚀 Quick Start
+## Quick start
 
-### Installation
-
-#### Option 1: Automated Installation (Recommended)
-Use the provided installation scripts for easy setup:
+**Copy what you want — nothing here requires a build step, Node, or npm.**
 
 ```bash
-# Unix/macOS
-./scripts/install.sh
+git clone https://github.com/DVC2/cursor_prompts.git
 
-# Windows PowerShell
-.\scripts\install.ps1
+# Option A: scripted (interactive, backs up anything it would overwrite)
+cd your-project && /path/to/cursor_prompts/scripts/install.sh
+
+# Option B: manual — copy only the pieces you want
+cp -r cursor_prompts/.cursor/agents   your-project/.cursor/
+cp -r cursor_prompts/.cursor/skills   your-project/.cursor/
+cp    cursor_prompts/templates/AGENTS.md  your-project/AGENTS.md   # then edit it
 ```
 
-**Installation Tiers:**
-- **Essential**: Core rules for any project (5 rules)
-- **Language**: Essential + JavaScript/TypeScript patterns (7 rules)
-- **Team**: Language + team coordination (9 rules)
-- **All**: Complete feature set (11 rules)
+Then restart Cursor. Rules auto-attach by glob; Skills/subagents load on demand (invoke a
+subagent with `/code-reviewer`, a Skill with `/debug`).
 
-#### Option 2: Manual Installation
-1. **Copy to your project**:
-   ```bash
-   git clone https://github.com/DVC2/cursor_prompts.git
-   cp -r cursor_prompts/.cursor/rules/ /your/project/.cursor/
-   ```
+> ⚠️ **Hooks run shell scripts on agent events.** Read `.cursor/hooks/*.sh` before installing
+> them, and only commit hooks your team trusts. They require `jq`.
 
-2. **Restart Cursor IDE** to load the new rules
+## Verify it loaded
 
-3. **Rules activate automatically** based on context and file patterns
+- Rules: open a `.ts`/`.js` file — the matching rule attaches in the agent's context panel.
+- Subagents/Skills: type `/` in Agent and confirm `code-reviewer`, `debug`, etc. appear.
+- Hooks: `jq . .cursor/hooks.json` should parse; try a blocked command to see the guard fire.
 
-### Verification
+## Compatibility
 
-Check that rules are loaded:
-- Open Cursor IDE
-- Use `Cmd+Shift+P` → "Show Active Rules" (if available)
-- Rules will appear in the context when relevant files are accessed
+Subagents and Skills require **Cursor 2.4+** (nested subagents: 2.5+). `AGENTS.md` and
+`.cursor/rules` work broadly. The legacy single-file `.cursorrules` is deprecated — migrate to
+`AGENTS.md` + `.cursor/rules`.
 
-## 🛡️ Rule Descriptions
+## Docs
 
-### Core Intelligence Rules
+- [`docs/quick-reference.md`](docs/quick-reference.md) — frontmatter & format cheat sheet for every primitive.
+- [`docs/troubleshooting.md`](docs/troubleshooting.md) — "my rule/Skill/hook isn't firing."
+- [`CONTRIBUTING.md`](CONTRIBUTING.md) — how to add a config.
 
-| Rule | Purpose | Key Features |
-|------|---------|--------------|
-| **memory-management.mdc** | Advanced memory management with intelligent context pruning | Context layers, smart pruning, pattern recognition, performance monitoring |
-| **session-coordinator.mdc** | Session continuity and context coordination | State management, session recovery, context transfer, knowledge retention |
-| **development-journal.mdc** | Development pattern tracking and workflow optimization | Decision logging, pattern learning, workflow optimization, metrics tracking |
+## License
 
-### Workflow Optimization Rules
-
-| Rule | Purpose | Key Features |
-|------|---------|--------------|
-| **ADR.mdc** | Intelligent Architectural Decision Record automation | Decision detection, template-based ADR creation, decision tracking |
-| **debugging.mdc** | Highly efficient debugging with minimal tool calls | Tool call optimization, pattern-based debugging, duplication prevention |
-| **efficiency.mdc** | Minimize premium tool calls while maintaining productivity | Command batching, file operation efficiency, resource conservation |
-| **commonsense.mdc** | Common sense development practices and mistake prevention | Best practice enforcement, mistake prevention, quality guidelines |
-| **terminal.mdc** | Terminal operation optimization for AI agents | Command chaining, output optimization, state verification |
-| **audit.mdc** | Comprehensive code quality assurance with surgical precision | Recursive audit loop, thinking protocols, surgical intervention |
-
-### Language-Specific Rules
-
-| Rule | Purpose | Key Features |
-|------|---------|--------------|
-| **javascript.mdc** | JavaScript ES2022+ best practices and modern patterns | Modern syntax, async patterns, performance optimization, functional programming |
-| **typescript.mdc** | TypeScript patterns and type system mastery | Type safety, advanced types, strict mode, architecture patterns |
-
-## 📖 Understanding .mdc Files
-
-`.mdc` files are Cursor's **MDC (Markdown with metadata)** project rules format:
-
-```yaml
----
-description: Brief description of what this rule does
-globs: ["**/*", "specific/path/**/*"]  # File patterns this rule applies to
-alwaysApply: true  # or false for conditional application
----
-
-# Rule content in Markdown format
-Your rule instructions for the AI agent...
-```
-
-## 🎛️ Customization
-
-### Modify for Your Project
-- **Adjust glob patterns** to match your project structure
-- **Customize rule content** for your development style
-- **Enable/disable specific features** within each rule
-- **Add project-specific patterns** and preferences
-
-### Example Customization
-```yaml
----
-description: Memory management optimized for React projects  
-globs: ["src/**/*.tsx", "src/**/*.ts", "components/**/*"]
-alwaysApply: true
----
-
-# React-specific optimizations...
-```
-
-## 🔬 Advanced Features
-
-### Intelligent Memory Management
-- **Context Layers**: Critical → Important → Historical → Archive
-- **Smart Pruning**: Relevance-based context optimization
-- **Pattern Recognition**: Code smell and architecture drift detection
-- **Performance Monitoring**: Regression detection and optimization
-
-### Session Coordination
-- **State Persistence**: Maintain context across sessions
-- **Intelligent Recovery**: Resume development workflows seamlessly
-- **Knowledge Transfer**: Share insights between team members
-- **Context Prediction**: Preload relevant information
-
-### Development Intelligence
-- **Pattern Learning**: Automatically discover and optimize workflows
-- **Decision Tracking**: Log and learn from development decisions
-- **Workflow Optimization**: Continuous improvement of development processes
-- **Metrics Collection**: Track and analyze development patterns
-
-## 📚 Documentation
-
-- **[Complete Usage Guide](examples/use_cases/cursor-mdc-rules-guide.md)**: Comprehensive documentation for using these rules
-- **[Quick Reference Guide](docs/quick-reference.md)**: Fast commands and patterns with performance metrics
-- **[Language-Specific Rules Guide](docs/language-specific-rules.md)**: JavaScript and TypeScript rules documentation
-- **[Integration Guide](docs/integration-guide.md)**: How to combine rules for maximum efficiency
-- **[Troubleshooting Guide](docs/troubleshooting.md)**: Common issues and diagnostic procedures
-- **[Metrics Dashboard](tools/metrics-dashboard/index.html)**: Track your productivity improvements
-- **[Cursor Official Documentation](https://docs.cursor.com/context/rules)**: Official Cursor rules documentation
-
-## 🔧 Quality Assurance
-
-This repository is kept simple for easy use:
-
-- **Just copy rules from `.cursor/rules/` to your project**
-- **No Node.js, npm, or extra tooling required**
-- **All validation is handled by GitHub Actions before merging**
-
-All changes are automatically validated through GitHub Actions before merging.
-
-## 🤝 Contributing
-
-1. **Test thoroughly** in real projects before submitting
-2. **Document your changes** and use cases clearly
-3. **Follow the existing rule format** and conventions
-4. **Provide examples** of how the rules improve workflows
-
-## 🏷️ Use Cases
-
-Perfect for:
-- **Large codebases** requiring intelligent context management
-- **Team projects** needing consistent AI behavior
-- **Long development sessions** requiring memory optimization
-- **Complex debugging scenarios** demanding efficiency
-- **Quality-focused development** preventing common mistakes
-
-## 📄 License
-
-This repository is public domain. Feel free to use, modify, and distribute these rules for any purpose.
-
-## 🔗 Related Resources
-
-- [Cursor IDE](https://cursor.com/) - AI-powered code editor
-- [Cursor Documentation](https://docs.cursor.com/) - Official documentation
-- [Cursor Community Forum](https://forum.cursor.com/) - Community discussions
-
----
-
-*These rules represent advanced Cursor usage patterns developed through extensive real-world usage. They're designed to work together as an integrated system for optimal AI-assisted development.* 
+[The Unlicense](LICENSE) — public domain. Copy freely.
