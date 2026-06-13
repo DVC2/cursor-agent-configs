@@ -1,0 +1,17 @@
+---
+description: Python (uv) project conventions (copy to .cursor/rules/python.mdc)
+globs: ["**/*.py"]
+alwaysApply: false
+---
+
+# Python conventions
+
+Formatting, import order, and lint rules are owned by **ruff**; type-strictness by **mypy**.
+This rule covers project choices a linter won't make.
+
+- Manage everything through **uv**: `uv add`, `uv run`, `uv sync` — never `pip` or a hand-edited
+  venv, and never commit changes without the matching `uv.lock` update.
+- Type-annotate public functions. Use `unknown`-style narrowing via `typing`; avoid `Any`.
+- `pathlib.Path` over `os.path`. `dataclass`/`pydantic` over ad-hoc dicts for structured data.
+- Raise specific exceptions; no bare `except:`; use `logging` over `print`.
+- No `subprocess(..., shell=True)` with untrusted input; pass an argument list. No string-built SQL.

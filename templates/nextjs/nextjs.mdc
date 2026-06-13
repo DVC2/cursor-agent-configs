@@ -1,0 +1,16 @@
+---
+description: Next.js App Router conventions (copy to .cursor/rules/nextjs.mdc)
+globs: ["app/**/*.tsx", "app/**/*.ts", "components/**/*.tsx"]
+alwaysApply: false
+---
+
+# Next.js (App Router) conventions
+
+- **Server Components by default.** Only add `'use client'` for state/effects/browser APIs;
+  push client boundaries to the leaves.
+- Fetch data in Server Components or server actions — not in `useEffect`.
+- `async`/`await` Server Components are fine; don't make a component client just to fetch.
+- Be explicit about caching: set `cache`/`next: { revalidate }` on `fetch`; don't rely on defaults.
+- Named exports for components (no `export default function Page` beyond the framework's required
+  route files). Use the `@/` alias for absolute imports.
+- Secrets are server-only and never prefixed `NEXT_PUBLIC_`. Validate input on every server action.

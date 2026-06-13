@@ -32,7 +32,10 @@ hard enforcement respectively.
 cursor_prompts/
 ├── AGENTS.md                       # this repo's own agent context (a worked example)
 ├── templates/
-│   └── AGENTS.md                   # starter AGENTS.md to copy into YOUR project
+│   ├── AGENTS.md                   # generic starter to copy into YOUR project
+│   ├── nextjs/                     # stack pack: Next.js + TS (AGENTS.md + scoped rule)
+│   ├── python-uv/                  # stack pack: Python + uv + ruff + pytest
+│   └── go/                         # stack pack: Go modules + table-driven tests
 ├── .cursor/
 │   ├── rules/
 │   │   ├── javascript.mdc          # short, glob-scoped — defers style to ESLint/Prettier
@@ -42,16 +45,29 @@ cursor_prompts/
 │   │   ├── verifier.md             # confirms "done" work actually runs
 │   │   └── test-author.md          # writes regression-catching tests
 │   ├── skills/
-│   │   ├── debug/SKILL.md          # systematic debug loop (reproduce→isolate→…→verify)
-│   │   └── write-adr/SKILL.md      # ADR template, lifecycle, and when-to-write gate
+│   │   ├── debug/                  # systematic debug loop (reproduce→isolate→…→verify)
+│   │   ├── write-adr/              # ADR template, lifecycle, and when-to-write gate
+│   │   └── init-agents-md/         # inspects a repo and drafts a tailored AGENTS.md
 │   ├── hooks.json
 │   └── hooks/
 │       ├── format.sh               # afterFileEdit: format the edited file
 │       └── guard-destructive.sh    # beforeShellExecution: block rm -rf /, force-push, …
-├── docs/                           # cheat sheet + troubleshooting
-├── scripts/                        # install.sh / install.ps1
+├── examples/hooks/                 # hooks cookbook: secret-guard, context-inject, test-on-save
+├── docs/                           # cheat sheet, cross-tool sync, troubleshooting
+├── scripts/                        # install.sh / install.ps1 / sync-agents.sh
 └── MIGRATION.md
 ```
+
+### Also in here
+
+- **Stack starter packs** — [`templates/`](templates/): copy a ready `AGENTS.md` + matching
+  scoped rule for Next.js, Python (uv), or Go.
+- **One config, every agent** — [`scripts/sync-agents.sh`](scripts/sync-agents.sh) generates
+  `CLAUDE.md` / `.github/copilot-instructions.md` / `GEMINI.md` from your `AGENTS.md`. See
+  [`docs/cross-tool.md`](docs/cross-tool.md).
+- **Hooks cookbook** — [`examples/hooks/`](examples/hooks/): more ready-to-wire hooks (block
+  committing secrets, inject git context at session start, run the matching test on save).
+- **`/init-agents-md`** — a Skill that inspects your repo and drafts an `AGENTS.md` for you.
 
 ## Quick start
 
